@@ -1,18 +1,30 @@
-from fastapi import FastAPI, HTTPException
-import redis
-import os
+import gradio as gr
+import psycopg2
 
-app = FastAPI()
+# PostgreSQL Database Connection
+conn = psycopg2.connect(
+    dbname="buddy_db",
+    user="postgres",
+    password="Chiku@4009",
+    host="localhost",  
+    port="5432"        
+)
+cursor = conn.cursor()
 
-# Redis connection
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-REDIS_DB = int(os.getenv("REDIS_DB", 1))
+# Buddy Response Function
+def buddy_response(message, history):
+    # Simple basic response
+    reply = f"I am your AI Buddy! How can I help you today?"
+    return reply
 
-try:
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
-    r.ping()  # Test connection
-    print("Connected to Redis")
-except redis.RedisError as e:
-    print("Redis connection failed:", str(e))
-    r = None
+# Create Chat Interface
+chatbot = gr.ChatInterface(
+    fn=buddy_response,
+    title="Deva",
+    description="Your SALAAR is here, Always for you!",
+    theme="soft",  # Clean soft colors
+)
+
+# Launch Gradio app
+if __name__ == "__main__":
+    chatbot.launch(share=True) 
