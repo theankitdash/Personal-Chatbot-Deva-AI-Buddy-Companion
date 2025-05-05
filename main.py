@@ -1,4 +1,5 @@
 import gradio as gr
+from langchain_ollama.llms import OllamaLLM
 import psycopg2
 
 # PostgreSQL Database Connection
@@ -11,11 +12,14 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
+# Initialize the LLM
+LLM = OllamaLLM(model="phi:latest")
+
 # Buddy Response Function
 def buddy_response(message, history):
     # Simple basic response
-    reply = f"I am your AI Buddy! How can I help you today?"
-    return reply
+    response = LLM.invoke(message)
+    return response
 
 # Create Chat Interface
 chatbot = gr.ChatInterface(
