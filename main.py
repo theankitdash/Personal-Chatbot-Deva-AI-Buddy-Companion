@@ -12,6 +12,31 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
+# Create a table if it doesn't exist
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_profile (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        age INT,
+        gender TEXT,
+        preferences JSONB
+    );
+""")
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS memory (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES user_profile(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        source TEXT,
+        tags TEXT[],
+        importance_level INT DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+""")
+conn.commit()
+
 # Initialize the LLM
 LLM = OllamaLLM(model="phi:latest")
 
@@ -25,7 +50,7 @@ def buddy_response(message, history):
 chatbot = gr.ChatInterface(
     fn=buddy_response,
     title="Deva",
-    description="Your SALAAR is here, Always for you!",
+    description="Always for you Buddy!",
     theme="soft",  # Clean soft colors
 )
 
