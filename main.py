@@ -1,7 +1,6 @@
-import gradio as gr
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.prompts import PromptTemplate
-from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+import gradio as gr
 import psycopg2
 from dotenv import load_dotenv
 import os
@@ -11,11 +10,11 @@ NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 
 # PostgreSQL Database Connection
 conn = psycopg2.connect(
-    dbname="buddy_db",
-    user="postgres",
-    password="Chiku@4009",
-    host="localhost",  
-    port="5432"        
+    dbname=os.getenv("DB_NAME"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT")
 )
 cursor = conn.cursor()
 
@@ -23,22 +22,18 @@ cursor = conn.cursor()
 
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS memory (
-        user_id TEXT PRIMARY KEY,
-        content TEXT NOT NULL,
-        source TEXT,
-        tags TEXT[],
-        importance_level INT DEFAULT 1,
-        preference_type TEXT, 
-        preference_value TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        memory_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        memory_type TEXT,                              -- 'event', 'preference', 'habit', 'thought', etc.
+        title TEXT,                                    -- short summary of the memory
+        content TEXT,                                  -- full detail or message
+        tags TEXT[],                                   -- optional tags like ['fitness', 'food', 'work']
+        importance INTEGER DEFAULT 1,                  -- scale from 1 (low) to 5 (high)
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- when the memory was added
+        memory_time TIMESTAMP,                         -- when the event actually happened (if applicable)
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 """)
 conn.commit()
-
-# Load PyTorch NER model from Hugging Face
-tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
-model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
-ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
 
 # Initialize the LLM
 LLM = ChatNVIDIA(
@@ -72,18 +67,21 @@ Deva:""",
     input_variables=["name", "age", "gender", "memory", "message"]
 )
 
-
 # Buddy Response Function
 def buddy_response(message, memory):
 
-    chat_input = chat_prompt.format_prompt(
+    system_prompt = chat_prompt.format_prompt(
         name="Ankit Dash",
         age=24,
         gender="Male",
         memory=memory,
         message=message
     )
-    response = LLM.invoke([{"role": "user", "content": chat_input.to_string()}])
+
+    response = LLM.invoke([
+        {"role": "system", "content": system_prompt.to_string()},
+        {"role": "user", "content": message}
+    ])
     return response.content
 
 # Create Chat Interface
