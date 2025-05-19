@@ -44,10 +44,17 @@ LLM = ChatNVIDIA(
   max_tokens=1024,
 )
 
+def save_memory(title, content, tags=None, importance=1, memory_time=None):
+    cursor.execute("""
+        INSERT INTO memory (memory_type, title, content, tags, importance, memory_time)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, ('thought', title, content, tags or [], importance, memory_time))
+    conn.commit()
+
 # Chat prompt
 chat_prompt = PromptTemplate(
     template="""
-You are Deva — an intelligent, emotionally aware, and ever-present AI companion for your user.
+You are Deva — an intelligent, emotionally aware, and ever-present companion for your user.
 
 Your role is more than just answering questions. You are:
 - A helpful assistant who can support with information, tasks, or reminders.
@@ -55,7 +62,7 @@ Your role is more than just answering questions. You are:
 - A lifelong companion who adapts to the user's preferences, mood, and growth over time.
 
 You remember your user's details:
-Name: {name}, Age: {age}, Gender: {gender}
+Name: {name}, Date of birth: {date_of_birth}, Gender: {gender}
 
 Here’s what you know so far:
 {memory}
@@ -64,7 +71,7 @@ Speak naturally, warmly, and intelligently. Show care, ask thoughtful questions,
 
 User: {message}
 Deva:""",
-    input_variables=["name", "age", "gender", "memory", "message"]
+    input_variables=["name", "date_of_birth", "gender", "memory", "message"]
 )
 
 # Buddy Response Function
@@ -72,7 +79,7 @@ def buddy_response(message, memory):
 
     system_prompt = chat_prompt.format_prompt(
         name="Ankit Dash",
-        age=24,
+        date_of_birth='08-11-2000',
         gender="Male",
         memory=memory,
         message=message
