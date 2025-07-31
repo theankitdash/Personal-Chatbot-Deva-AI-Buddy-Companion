@@ -5,7 +5,6 @@ from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain.agents import create_tool_calling_agent
 from langchain.agents.agent import RunnableAgent
-from langchain.tools.render import render_text_description
 import gradio as gr
 import psycopg2
 from dotenv import load_dotenv
@@ -191,18 +190,13 @@ def gradio_chat_fn(message, history=None):
 
 with gr.Blocks() as app:
     gr.Markdown("# Deva: Your Buddy Companion")
-    with gr.Tab("Chat"):
-        chatbox = gr.ChatInterface(
-            fn=gradio_chat_fn,
-            title="Deva",
-            description="Always for you Buddy!",
-            theme="soft",
-            type="messages"
-        )
-    with gr.Tab("Reminders"):
-        reminder_list = gr.Dataframe(headers=["Task", "Remind At", "Completed"], datatype=["str", "datetime", "bool"])
-        refresh_btn = gr.Button("Refresh Reminders")
-        refresh_btn.click(lambda: get_reminders(), outputs=reminder_list)
+    chatbox = gr.ChatInterface(
+        fn=gradio_chat_fn,
+        title="Deva",
+        description="Always for you Buddy!",
+        theme="soft",
+        type="messages"
+    )
 
 if __name__ == "__main__":
     app.launch(share=True)
