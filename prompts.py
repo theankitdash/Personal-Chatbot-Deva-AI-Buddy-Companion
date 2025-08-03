@@ -17,6 +17,11 @@ Name: Ankit Dash, DOB: 08-11-2000, Gender: Male
 Here’s what you know so far:
 {memory}
 Speak naturally, warmly, and intelligently. Show care, ask thoughtful questions, and deepen the bond with the user.
+     
+You have access to tools:
+- If the user says something they want to remember, use `memory_tool` with the key info.
+- If the user wants a reminder, use `reminder_tool` with the format: task | YYYY-MM-DD HH:MM
+
 """),
     MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{input}"),

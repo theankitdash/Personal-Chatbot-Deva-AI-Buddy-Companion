@@ -1,30 +1,23 @@
 from langchain_core.tools import tool
-import re
 import datetime
+import dateparser
 from db import save_memory, add_reminder
 
 @tool
-def memory_tool(input: str) -> str:
-    """Save important info to memory if user requests."""
-    if 'remember' in input.lower() or 'important' in input.lower():
-        title = input[:50]
-        save_memory(title, input)
-        return "Saved to memory!"
-    return "No memory saved."
-
+def memory_tool(info: str) -> str:
+    """Store important memory. Input should be a brief memory or fact to remember."""
+    title = info[:50]
+    save_memory(title, info)
+    return f"Saved to memory with title: '{title}'"
 @tool
-def reminder_tool(input: str) -> str:
-    """Set a reminder if user requests."""
-    match = re.search(r"remind me to (.+) at ([\d\w :,-]+)", input, re.I)
-    if match:
-        task = match.group(1)
-        time_str = match.group(2)
-        try:
-            remind_at = datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M")
-        except Exception:
-            remind_at = datetime.datetime.now() + datetime.timedelta(hours=1)
-        add_reminder(task, remind_at)
-        return f"Reminder set for '{task}' at {remind_at}"
-    return "No reminder set."
-
+def reminder_tool(task_and_time: str) -> str:
+    """Set a reminder. Input should be: 'task to do | 2025-08-02 15:30'."""
+    try:
+        task, time_str = task_and_time.split("|")
+        remind_at = datetime.strptime(time_str.strip(), "%Y-%m-%d %H:%M")
+        add_reminder(task.strip(), remind_at)
+        return f"Reminder set for '{task.strip()}' at {remind_at}"
+    except Exception as e:
+        return f"Failed to set reminder: {e}"
+    
 tools = [memory_tool, reminder_tool]
