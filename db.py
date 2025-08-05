@@ -1,7 +1,6 @@
 import psycopg2
 import os
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, AIMessage
 
 load_dotenv()
 
@@ -15,14 +14,6 @@ conn = psycopg2.connect(
 cursor = conn.cursor()
 
 def setup_tables():
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chat_history (
-            chat_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            role TEXT CHECK (role IN ('human', 'ai')) NOT NULL,
-            message TEXT NOT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS memory (
             memory_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,27 +37,6 @@ def setup_tables():
         );
     """)
     conn.commit()
-
-def save_chat_message(role, message):
-    cursor.execute("""
-        INSERT INTO chat_history (role, message) VALUES (%s, %s)
-    """, (role, message))
-    conn.commit()
-
-def load_chat_history(limit=20):
-    cursor.execute("""
-        SELECT role, message FROM chat_history
-        ORDER BY timestamp ASC
-        LIMIT %s
-    """, (limit,))
-    rows = cursor.fetchall()
-    messages = []
-    for role, msg in rows:
-        if role == 'human':
-            messages.append(HumanMessage(content=msg))
-        elif role == 'ai':
-            messages.append(AIMessage(content=msg))
-    return messages
 
 def save_memory(title, content, tags=None, importance=1, memory_time=None):
     cursor.execute("""
