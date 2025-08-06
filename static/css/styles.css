@@ -20,8 +20,8 @@ h1 {
   background: #fff;
   border-radius: 20px;
   padding: 30px;
-  max-width: 1200px;          /* Make the box bigger */
-  margin: 0 auto;             /* Center it horizontally */
+  max-width: 1200px;          
+  margin: 0 auto;             
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
 }
 

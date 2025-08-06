@@ -1,43 +1,61 @@
-const video = document.getElementById('liveVideo');
+document.addEventListener("DOMContentLoaded", () => {
+  fetchTasksAndReminders();
+  startLiveVideoFeed();
+});
 
-let mediaStream;
-
-async function startMediaStream() {
+/** Fetch tasks and reminders from FastAPI backend */
+async function fetchTasksAndReminders() {
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
+    const response = await fetch("http://localhost:8000/api/tasks");
+    if (!response.ok) throw new Error("Failed to fetch tasks");
+
+    const data = await response.json();
+    const taskListDiv = document.getElementById("taskList");
+    taskListDiv.innerHTML = ""; // Clear existing
+
+    data.tasks.forEach((task) => {
+      const taskDiv = document.createElement("div");
+      taskDiv.className = "task-item";
+      taskDiv.textContent = `🔔 ${task.title} - ${task.time}`;
+      taskListDiv.appendChild(taskDiv);
     });
-
-    // Set the video stream
-    video.srcObject = mediaStream;
-
-    // Optional: play video
-    await video.play();
-
-    // Get audio track for processing (e.g., to send to Whisper or speech-to-text backend)
-    const audioTracks = mediaStream.getAudioTracks();
-    if (audioTracks.length > 0) {
-      const audioStream = new MediaStream([audioTracks[0]]);
-      
-      // Pass audioStream to your LLM voice pipeline
-      handleAudioStream(audioStream);
-    }
-
   } catch (error) {
-    console.error("Error accessing camera or microphone:", error);
+    console.error("Error fetching tasks:", error);
   }
 }
 
-// Placeholder: your function to handle audio input
-function handleAudioStream(audioStream) {
-  console.log("Audio stream is ready for LLM processing");
+/** Start live video feed using WebRTC (FastRTC signaling assumed) */
+async function startLiveVideoFeed() {
+  const video = document.getElementById("liveVideo");
 
-  // Example: stream to Whisper or any STT backend
-  // Then take transcription and send to LLM
-  // Then use TTS to speak back the response
+  const peerConnection = new RTCPeerConnection();
 
-  // ⚠️ This part depends on your architecture (e.g., WebSocket to backend)
+  peerConnection.ontrack = (event) => {
+    video.srcObject = event.streams[0];
+  };
+
+  try {
+    // Fetch offer from FastRTC server
+    const offerResponse = await fetch("http://localhost:8000/webrtc_offer");
+    const offer = await offerResponse.json();
+
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+    // Create answer
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    // Send answer back to server
+    await fetch("http://localhost:8000/webrtc_answer", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ answer: peerConnection.localDescription })
+    });
+
+    console.log("WebRTC connection established.");
+  } catch (error) {
+    console.error("Failed to start live video feed:", error);
+  }
 }
-
-startMediaStream();
