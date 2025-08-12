@@ -11,9 +11,33 @@ export default function AIBuddyDashboard() {
   const [transcript, setTranscript] = useState([]);
 
   useEffect(() => {
-    fetch("/api/user").then(res => res.json()).then(setUser);
-    fetch("/api/tasks").then(res => res.json()).then(setTasks);
-    fetch("/api/reminders").then(res => res.json()).then(setReminders);
+    // Fetch the first (or current) user
+    fetch("/api/users")
+      .then(res => res.json())
+      .then(data => {
+        if (data.users && data.users.length > 0) {
+          setUser(data.users[0]); // For now, take the first user
+        }
+      });
+
+    // Fetch all memories
+    fetch("/api/memory")
+      .then(res => res.json())
+      .then(data => {
+        if (data.memory) {
+          // Extract tasks and reminders from memory table
+          const taskItems = data.memory
+            .filter(m => m.memory_type === "task")
+            .map(m => m.title || m.content);
+
+          const reminderItems = data.memory
+            .filter(m => m.memory_type === "reminder")
+            .map(m => m.title || m.content);
+
+          setTasks(taskItems);
+          setReminders(reminderItems);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -37,24 +61,24 @@ export default function AIBuddyDashboard() {
               <img src="/avatar.png" alt="User" />
             </Avatar>
             <div>
-              <p className="text-lg font-semibold">{user?.name}</p>
-              <p className="text-sm text-gray-500">{user?.role}</p>
+              <p className="text-lg font-semibold text-black">{user?.name}</p>
+              <p className="text-sm text-gray-500 text-black">AI Buddy User</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <h2 className="text-md font-semibold mb-2">Upcoming Tasks</h2>
+            <h2 className="text-md font-semibold mb-2 text-black">Upcoming Tasks</h2>
             <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-              {tasks.map((task, idx) => <li key={idx}>{task}</li>)}
+              {tasks.length > 0 ? tasks.map((task, idx) => <li key={idx}>{task}</li>) : <li>No tasks found</li>}
             </ul>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <h2 className="text-md font-semibold mb-2">Reminders</h2>
+            <h2 className="text-md font-semibold mb-2 text-black">Reminders</h2>
             <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-              {reminders.map((rem, idx) => <li key={idx}>{rem}</li>)}
+              {reminders.length > 0 ? reminders.map((rem, idx) => <li key={idx}>{rem}</li>) : <li>No reminders found</li>}
             </ul>
           </CardContent>
         </Card>
@@ -64,9 +88,15 @@ export default function AIBuddyDashboard() {
       <div className="col-span-2 relative">
         <Card className="w-full h-full">
           <CardContent className="p-4 flex flex-col h-full relative">
-            <h2 className="text-lg font-semibold mb-4">Talk to your AI Buddy</h2>
+            <h2 className="text-lg font-semibold mb-4 text-black">Talk to your AI Buddy</h2>
             <div className="flex-grow bg-black rounded-xl overflow-hidden mb-4 relative">
-              <video id="liveVideo" autoPlay muted playsInline className="w-full h-full object-cover"></video>
+              <video
+                id="liveVideo"
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              ></video>
               {/* Transcript Overlay */}
               <div className="absolute bottom-2 right-2 bg-white/80 p-2 rounded-md max-w-xs text-sm overflow-y-auto max-h-48">
                 {transcript.map((line, idx) => (
