@@ -16,8 +16,9 @@ async def connect_db():
     await conn.execute("""
 
         CREATE TABLE IF NOT EXISTS user_details (
-            name TEXT PRIMARY KEY,
-            embedding_path TEXT 
+            username TEXT PRIMARY KEY,
+            name TEXT,
+            face_embedding REAL[]
         );
 
     """)
@@ -26,6 +27,7 @@ async def connect_db():
 
         CREATE TABLE IF NOT EXISTS memory (
             memory_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            username TEXT NOT NULL REFERENCES user_details(username) ON DELETE CASCADE,
 
             memory_type TEXT NOT NULL,
             title TEXT,
@@ -33,7 +35,7 @@ async def connect_db():
             tags TEXT[],
             importance INTEGER DEFAULT 1,
 
-            embedding_id TEXT,  -- ID or filename for FAISS vector
+            embedding REAL[],  
 
             memory_time TIMESTAMP,
             remind_at TIMESTAMP,
@@ -46,4 +48,10 @@ async def connect_db():
         );
 
     """)
+
+    # Create GIN index on tags for faster search
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_memory_tags ON memory USING GIN(tags);
+    """)
+    
     return conn

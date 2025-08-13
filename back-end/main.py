@@ -2,26 +2,27 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from db_connect import connect_db
-import os
 from uuid import UUID
 from datetime import datetime
 
 # -------- App Init --------
-app = FastAPI(title="Fusion Flair Memory API", version="1.0")
+app = FastAPI()
 
 # -------- Models --------
 class UserDetails(BaseModel):
+    username: str
     name: str
-    face_embedding: Optional[List[float]]  # vector(512)
+    face_embedding: List[float]  # vector(512)
 
-class MemoryItem(BaseModel):
+class Memory(BaseModel):
     memory_id: Optional[UUID]
+    username: str  # link to user
     memory_type: str
-    title: Optional[str]
-    content: Optional[str]
+    title: Optional[str] = None
+    content: Optional[str] = None
     tags: Optional[List[str]] = []
     importance: Optional[int] = 1
-    embedding: Optional[List[float]] = None  # vector(512)
+    embedding: Optional[List[float]] = None  # vector for FAISS
     memory_time: Optional[datetime] = None
     remind_at: Optional[datetime] = None
     repeat_interval: Optional[str] = None
@@ -33,12 +34,13 @@ class MemoryItem(BaseModel):
 async def get_users():
     conn = await connect_db()
     try:
-        rows = await conn.fetch("SELECT name, embedding_path FROM user_details")
+        rows = await conn.fetch("SELECT username, name, face_embedding FROM user_details")
         return {
             "users": [
                 {
+                    "username": r["username"],
                     "name": r["name"],
-                    "face_embedding": list(r["embedding_path"]) if r["embedding_path"] else None
+                    "face_embedding": list(r["face_embedding"]) if r["face_embedding"] else None
                 }
                 for r in rows
             ]
@@ -51,11 +53,12 @@ async def add_user(user: UserDetails):
     conn = await connect_db()
     try:
         await conn.execute("""
-            INSERT INTO user_details (name, embedding_path)
-            VALUES ($1, $2)
-            ON CONFLICT (name) DO UPDATE
-            SET embedding_path = EXCLUDED.embedding_path
-        """, user.name, user.face_embedding)
+            INSERT INTO user_details (username, name, face_embedding)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (username) DO UPDATE
+            SET name = EXCLUDED.name,
+                face_embedding = EXCLUDED.face_embedding
+        """, user.username, user.name, user.face_embedding)
         return {"status": "success"}
     finally:
         await conn.close()
@@ -82,16 +85,16 @@ async def get_memory(memory_id: UUID):
         await conn.close()
 
 @app.post("/api/memory")
-async def add_memory(memory: MemoryItem):
+async def add_memory(memory: Memory):
     conn = await connect_db()
     try:
         await conn.execute("""
             INSERT INTO memory (
-                memory_type, title, content, tags, importance, embedding,
-                memory_time, remind_at, repeat_interval, completed, priority
+                username, memory_type, title, content, tags, importance,
+                embedding, memory_time, remind_at, repeat_interval, completed, priority
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        """, memory.memory_type, memory.title, memory.content, memory.tags,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        """, memory.username, memory.memory_type, memory.title, memory.content, memory.tags,
             memory.importance, memory.embedding, memory.memory_time,
             memory.remind_at, memory.repeat_interval, memory.completed, memory.priority)
         return {"status": "success"}
@@ -99,7 +102,7 @@ async def add_memory(memory: MemoryItem):
         await conn.close()
 
 @app.put("/api/memory/{memory_id}")
-async def update_memory(memory_id: UUID, memory: MemoryItem):
+async def update_memory(memory_id: UUID, memory: Memory):
     conn = await connect_db()
     try:
         await conn.execute("""
@@ -110,9 +113,8 @@ async def update_memory(memory_id: UUID, memory: MemoryItem):
                 priority = $11, updated_at = CURRENT_TIMESTAMP
             WHERE memory_id = $12
         """, memory.memory_type, memory.title, memory.content, memory.tags,
-            memory.importance, memory.embedding, memory.memory_time,
-            memory.remind_at, memory.repeat_interval, memory.completed, memory.priority,
-            memory_id)
+            memory.importance, memory.embedding, memory.memory_time, memory.remind_at, 
+            memory.repeat_interval, memory.completed, memory.priority, memory_id)
         return {"status": "success"}
     finally:
         await conn.close()
@@ -141,3 +143,6 @@ class WebRTCAnswer(BaseModel):
 async def receive_answer(answer: WebRTCAnswer):
     print("Received WebRTC answer:", answer.answer)
     return {"status": "received"}
+
+
+# Run the application using uvicorn main:app --reload
