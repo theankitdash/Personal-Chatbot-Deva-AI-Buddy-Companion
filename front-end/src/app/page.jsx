@@ -9,31 +9,21 @@ export default function AIBuddyDashboard() {
   const [tasks, setTasks] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [transcript, setTranscript] = useState([]);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    // Fetch the first (or current) user
     fetch("/api/users")
       .then(res => res.json())
       .then(data => {
-        if (data.users && data.users.length > 0) {
-          setUser(data.users[0]); // For now, take the first user
-        }
+        if (data.users && data.users.length > 0) setUser(data.users[0]);
       });
 
-    // Fetch all memories
     fetch("/api/memory")
       .then(res => res.json())
       .then(data => {
         if (data.memory) {
-          // Extract tasks and reminders from memory table
-          const taskItems = data.memory
-            .filter(m => m.memory_type === "task")
-            .map(m => m.title || m.content);
-
-          const reminderItems = data.memory
-            .filter(m => m.memory_type === "reminder")
-            .map(m => m.title || m.content);
-
+          const taskItems = data.memory.filter(m => m.memory_type === "task").map(m => m.title || m.content);
+          const reminderItems = data.memory.filter(m => m.memory_type === "reminder").map(m => m.title || m.content);
           setTasks(taskItems);
           setReminders(reminderItems);
         }
@@ -51,15 +41,28 @@ export default function AIBuddyDashboard() {
     return () => ws.close();
   }, []);
 
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+    try {
+      await fetch("/api/agent/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message })
+      });
+      setTranscript(prev => [...prev, { sender: "user", text: message }]);
+      setMessage("");
+    } catch (err) {
+      console.error("Send message error:", err);
+    }
+  };
+
   return (
     <div className="grid grid-cols-3 gap-4 p-4 min-h-screen bg-gray-50">
       {/* Left Sidebar */}
       <div className="col-span-1 space-y-4">
         <Card>
           <CardContent className="flex items-center space-x-4 p-4">
-            <Avatar>
-              <img src="/avatar.png" alt="User" />
-            </Avatar>
+            <Avatar><img src="/avatar.png" alt="User" /></Avatar>
             <div>
               <p className="text-lg font-semibold text-black">{user?.name}</p>
               <p className="text-sm text-gray-500 text-black">AI Buddy User</p>
@@ -86,17 +89,11 @@ export default function AIBuddyDashboard() {
 
       {/* Right Side - Live Feed with Transcript */}
       <div className="col-span-2 relative">
-        <Card className="w-full h-full">
-          <CardContent className="p-4 flex flex-col h-full relative">
+        <Card className="w-full h-full flex flex-col">
+          <CardContent className="p-4 flex flex-col h-full relative flex-grow">
             <h2 className="text-lg font-semibold mb-4 text-black">Talk to your AI Buddy</h2>
             <div className="flex-grow bg-black rounded-xl overflow-hidden mb-4 relative">
-              <video
-                id="liveVideo"
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover"
-              ></video>
+              <video id="liveVideo" autoPlay muted playsInline className="w-full h-full object-cover"></video>
               {/* Transcript Overlay */}
               <div className="absolute bottom-2 right-2 bg-white/80 p-2 rounded-md max-w-xs text-sm overflow-y-auto max-h-48">
                 {transcript.map((line, idx) => (
@@ -105,6 +102,16 @@ export default function AIBuddyDashboard() {
                   </div>
                 ))}
               </div>
+            </div>
+            {/* Text Box to Send Message */}
+            <div className="flex gap-2 mt-2">
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type a message"
+                className="flex-grow rounded-md border px-3 py-2 placeholder-gray-400 text-black"
+              />
+              <button onClick={sendMessage} className="px-4 py-2 rounded-lg bg-blue-600 text-white">Send</button>
             </div>
           </CardContent>
         </Card>
