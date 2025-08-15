@@ -16,8 +16,8 @@ async def connect_db():
     await conn.execute("""
 
         CREATE TABLE IF NOT EXISTS user_details (
-            username TEXT PRIMARY KEY,
-            name TEXT,
+            username TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
             face_embedding REAL[]
         );
 
@@ -25,33 +25,41 @@ async def connect_db():
 
     await conn.execute("""
 
-        CREATE TABLE IF NOT EXISTS memory (
-            memory_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        CREATE TABLE IF NOT EXISTS events (
+            event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             username TEXT NOT NULL REFERENCES user_details(username) ON DELETE CASCADE,
 
-            memory_type TEXT NOT NULL,
-            title TEXT,
-            content TEXT,
-            tags TEXT[],
-            importance INTEGER DEFAULT 1,
+            type TEXT NOT NULL CHECK (type IN ('task', 'reminder', 'meeting', 'birthday', 'other')),
+            description TEXT NOT NULL,
 
-            embedding REAL[],  
+            event_time TIMESTAMP NOT NULL, -- due date / reminder time
+            repeat_interval INTERVAL, -- NULL if one-time, e.g., '1 day', '1 week'
 
-            memory_time TIMESTAMP,
-            remind_at TIMESTAMP,
-            repeat_interval INTERVAL,
-            completed BOOLEAN DEFAULT FALSE,
-            priority INTEGER DEFAULT 1,
+            priority SMALLINT CHECK (priority BETWEEN 1 AND 5) DEFAULT 3, -- urgency
 
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status TEXT NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'in-progress', 'completed', 'dismissed')),
+
+            completed_at TIMESTAMP, -- for completed tasks or acknowledged reminders
+
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
     """)
 
-    # Create GIN index on tags for faster search
     await conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_memory_tags ON memory USING GIN(tags);
+
+        CREATE TABLE IF NOT EXISTS user_knowledge (
+            knowledge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            username TEXT NOT NULL REFERENCES user_details(username) ON DELETE CASCADE,
+            fact TEXT NOT NULL, -- the information about the user
+            category TEXT CHECK (category IN ('preference', 'memory', 'skill', 'habit', 'other')) DEFAULT 'other',
+            importance SMALLINT CHECK (importance BETWEEN 1 AND 5) DEFAULT 3, -- priority for recall
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
     """)
     
-    return conn
+    return conn 

@@ -9,26 +9,32 @@ export default function AIBuddyDashboard() {
   const [tasks, setTasks] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [transcript, setTranscript] = useState([]);
-  const [message, setMessage] = useState("");
+  const username = "ankit";
 
   useEffect(() => {
-    fetch("/api/users")
-      .then(res => res.json())
-      .then(data => {
-        if (data.users && data.users.length > 0) setUser(data.users[0]);
-      });
+    fetch(`/api/user_details/${username}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch user details");
+        return res.json();
+      })
+      .then((data) => setUser(data))
+      .catch((err) => console.error(err));
 
-    fetch("/api/memory")
-      .then(res => res.json())
-      .then(data => {
-        if (data.memory) {
-          const taskItems = data.memory.filter(m => m.memory_type === "task").map(m => m.title || m.content);
-          const reminderItems = data.memory.filter(m => m.memory_type === "reminder").map(m => m.title || m.content);
-          setTasks(taskItems);
-          setReminders(reminderItems);
-        }
-      });
-  }, []);
+    fetch(`/api/events/${username}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch events");
+        return res.json();
+      })
+      .then((data) => {
+        const taskItems = data.filter((e) => e.type === "task").map((e) => e.description);
+        const reminderItems = data.filter((e) => e.type === "reminder").map((e) => e.description);
+        setTasks(taskItems);
+        setReminders(reminderItems);
+      })
+      .catch((err) => console.error(err));
+
+  }, [username]);
+
 
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws/rtc");
@@ -40,21 +46,6 @@ export default function AIBuddyDashboard() {
     };
     return () => ws.close();
   }, []);
-
-  const sendMessage = async () => {
-    if (!message.trim()) return;
-    try {
-      await fetch("/api/agent/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: message })
-      });
-      setTranscript(prev => [...prev, { sender: "user", text: message }]);
-      setMessage("");
-    } catch (err) {
-      console.error("Send message error:", err);
-    }
-  };
 
   return (
     <div className="grid grid-cols-3 gap-4 p-4 min-h-screen bg-gray-50">
@@ -102,16 +93,6 @@ export default function AIBuddyDashboard() {
                   </div>
                 ))}
               </div>
-            </div>
-            {/* Text Box to Send Message */}
-            <div className="flex gap-2 mt-2">
-              <input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a message"
-                className="flex-grow rounded-md border px-3 py-2 placeholder-gray-400 text-black"
-              />
-              <button onClick={sendMessage} className="px-4 py-2 rounded-lg bg-blue-600 text-white">Send</button>
             </div>
           </CardContent>
         </Card>
