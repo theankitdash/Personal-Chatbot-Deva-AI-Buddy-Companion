@@ -150,6 +150,68 @@ class UserKnowledge(BaseModel):
     category: Optional[str] = None
     importance: Optional[int] = 3
 
+@app.post("/api/register_user")
+async def register_user(
+    username: str = Form(...),
+    name: str = Form(...),
+    file: UploadFile = File(...)
+):
+    try:
+        conn = await connect_db()
+        image_bytes = await file.read()
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        encodings = face_recognition.face_encodings(img)
+        if not encodings:
+            raise HTTPException(status_code=400, detail="No face detected")
+        
+        face_embedding = encodings[0].tolist()
+
+        await conn.execute(
+            """
+            INSERT INTO user_details (username, name, face_embedding)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (username)
+            DO UPDATE SET name = EXCLUDED.name, face_embedding = EXCLUDED.face_embedding;
+            """,
+            username, name, face_embedding
+        )
+        await conn.close()
+
+        return {"message": "User registered successfully", "username": username}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/verify_face")
+async def verify_face(file: UploadFile = File(...)):
+    try:
+        conn = await connect_db()
+        image_bytes = await file.read()
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        encodings = face_recognition.face_encodings(img)
+        if not encodings:
+            raise HTTPException(status_code=400, detail="No face detected")
+        
+        face_embedding = np.array(encodings[0])
+
+        # Get all users
+        rows = await conn.fetch("SELECT username, face_embedding FROM user_details")
+        await conn.close()
+
+        for row in rows:
+            db_embedding = np.array(row["face_embedding"])
+            match = face_recognition.compare_faces([db_embedding], face_embedding)[0]
+            if match:
+                return {"message": "Login successful", "username": row["username"]}
+
+        raise HTTPException(status_code=401, detail="No matching face found")
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/user_details/")
 async def add_user(details: UserDetails):

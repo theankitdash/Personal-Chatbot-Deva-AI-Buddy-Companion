@@ -18,7 +18,7 @@ async def connect_db():
         CREATE TABLE IF NOT EXISTS user_details (
             username TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
-            face_embedding REAL[]
+            face_embedding FLOAT8[]
         );
 
     """)
