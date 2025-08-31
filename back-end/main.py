@@ -212,23 +212,33 @@ async def verify_face(file: UploadFile = File(...)):
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        encodings = face_recognition.face_encodings(img)
-        if not encodings:
+        emb = get_embedding(img)
+        if emb is None:
             raise HTTPException(status_code=400, detail="No face detected")
-        
-        face_embedding = np.array(encodings[0])
+        emb = emb.flatten()
 
         # Get all users
         rows = await conn.fetch("SELECT username, face_embedding FROM user_details")
         await conn.close()
 
+        def cos_sim(a, b):
+            a = np.array(a)
+            b = np.array(b)
+            return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+        best_user = None
+        best_score = -1
         for row in rows:
             db_embedding = np.array(row["face_embedding"])
-            match = face_recognition.compare_faces([db_embedding], face_embedding)[0]
-            if match:
-                return {"message": "Login successful", "username": row["username"]}
+            score = cos_sim(emb, db_embedding)
+            if score > best_score:
+                best_user = row["username"]
+                best_score = score
 
-        raise HTTPException(status_code=401, detail="No matching face found")
+        if best_score > 0.75:  # threshold, adjust as needed
+            return {"message": "Login successful", "username": best_user, "similarity": best_score}
+        else:
+            raise HTTPException(status_code=401, detail="No matching face found")
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
