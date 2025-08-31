@@ -9,12 +9,17 @@ from uuid import UUID
 from datetime import datetime
 import traceback
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastrtc import Stream, AsyncAudioVideoStreamHandler, wait_for_item
 import google.genai as genai
 from pydantic import BaseModel
 from PIL import Image
+
+import cv2
+import numpy as np
+import torch
+from facenet_pytorch import MTCNN, InceptionResnetV1
 
 from db_connect import connect_db
 
@@ -22,6 +27,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI()
+
+# Setup models (move to top if needed)
+mtcnn = MTCNN(image_size=160, margin=0, min_face_size=40)
+facenet = InceptionResnetV1(pretrained='vggface2').eval()
+
 
 # ---------- Helpers ----------
 def encode_audio(data: np.ndarray) -> dict:
@@ -150,23 +160,33 @@ class UserKnowledge(BaseModel):
     category: Optional[str] = None
     importance: Optional[int] = 3
 
+def get_embedding(img_bgr):
+    face = mtcnn(img_bgr)
+    if face is None: return None
+    with torch.no_grad():
+        return facenet(face.unsqueeze(0)).cpu().numpy()
+    
 @app.post("/api/register_user")
 async def register_user(
     username: str = Form(...),
     name: str = Form(...),
-    file: UploadFile = File(...)
+    files: List[UploadFile] = File(...)
 ):
     try:
         conn = await connect_db()
-        image_bytes = await file.read()
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        encodings = face_recognition.face_encodings(img)
-        if not encodings:
-            raise HTTPException(status_code=400, detail="No face detected")
+        samples = []
+        for file in files:
+            image_bytes = await file.read()
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            emb = get_embedding(img)
+            if emb is not None:
+                samples.append(emb)
+        if not samples:
+            raise HTTPException(status_code=400, detail="No face detected in any sample")
         
-        face_embedding = encodings[0].tolist()
+        mean_emb = np.mean(np.vstack(samples), axis=0).flatten().tolist()
+
 
         await conn.execute(
             """
@@ -175,7 +195,7 @@ async def register_user(
             ON CONFLICT (username)
             DO UPDATE SET name = EXCLUDED.name, face_embedding = EXCLUDED.face_embedding;
             """,
-            username, name, face_embedding
+            username, name, mean_emb
         )
         await conn.close()
 
