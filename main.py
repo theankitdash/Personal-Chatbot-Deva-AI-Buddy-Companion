@@ -1,5 +1,6 @@
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.prompts import PromptTemplate
+from langchain_core.chat_history import InMemoryChatMessageHistory
 import gradio as gr
 import psycopg2
 from dotenv import load_dotenv
@@ -8,6 +9,9 @@ import os
 load_dotenv()
 
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+
+# Initialize in-memory chat history
+chat_history = InMemoryChatMessageHistory()
 
 # PostgreSQL Database Connection
 conn = psycopg2.connect(    
@@ -77,7 +81,14 @@ chat_prompt = PromptTemplate(
 )
 
 # Buddy Response Function
-def buddy_response(message, memory):    
+def buddy_response(message, memory): 
+
+    # Add the user message to history
+    chat_history.add_user_message(message)
+
+    # Prepare memory from chat history
+    memory = "\n".join([f"{msg.type}: {msg.content}" for msg in chat_history.messages])
+
     system_prompt = chat_prompt.format_prompt(        
         name="Ankit Dash",            
         date_of_birth='08-11-2000',        
@@ -88,8 +99,12 @@ def buddy_response(message, memory):
     
     response = LLM.invoke([        
         {"role": "system", "content": system_prompt.to_string()},        
-        {"role": "user", "content": message}    ]
-        )    
+        {"role": "user", "content": message} 
+    ])
+
+    # Add LLM response to history
+    chat_history.add_ai_message(response.content)
+    
     return response.content
 
 # Create Chat Interface
