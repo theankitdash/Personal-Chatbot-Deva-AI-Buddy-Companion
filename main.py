@@ -46,7 +46,7 @@ LLM = ChatNVIDIA(
     model="mistralai/mistral-7b-instruct-v0.3",  
     api_key=NVIDIA_API_KEY,   
     temperature=0.2,  top_p=0.7,  
-    max_tokens=1024,
+    max_completion_tokens=1024,
     
 )
 
@@ -113,8 +113,9 @@ chatbot = gr.ChatInterface(
     title="Deva",    
     description="Always for you Buddy!",    
     theme="soft",  # Clean soft colors
+    type="messages"
 )
 
 # Launch Gradio app
 if __name__ == "__main__":
-    chatbot.launch()
+    chatbot.launch(share=True) 
